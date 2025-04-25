@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Interjú Diavetítés</title>
+  <style>
+    html, body {
+      margin: 0; padding: 0; height: 100%;
+      font-family: 'Segoe UI', sans-serif;
+      background: #0d1117; color: #c9d1d9; overflow: hidden;
+    }
+    #slide, #editor, #overview {
+      position: absolute; top: 0; left: 0;
+      width: 100%; height: 100%;
+      display: none; padding: 2em; box-sizing: border-box;
+    }
+    #slide { display: flex; flex-direction: column;
+      justify-content: center; align-items: center; text-align: center;
+    }
+    #slide h1 { font-size: 2.5em; margin-bottom: 0.5em; color: #58a6ff; }
+    #slide p { font-size: 1.5em; max-width: 800px; }
+
+    .controls {
+      position: absolute; bottom: 2em; left: 50%;
+      transform: translateX(-50%); display: flex; gap: 1em;
+    }
+
+    .controls button {
+      padding: 0.8em 1.5em; font-size: 1em;
+      background: #238636; border: none; color: white;
+      border-radius: 6px; cursor: pointer;
+    }
+
+    .overview-btn { background: #6c757d; }
+    .edit-btn { background: #8250df; }
+
+    #overview {
+      background: #161b22; overflow-y: auto;
+    }
+
+    #overview h2 { font-size: 2em; margin-top: 0; }
+    .card {
+      background: #21262d; border-radius: 8px;
+      padding: 1em; margin-bottom: 1em;
+      cursor: pointer;
+    }
+    .card:hover { background: #30363d; }
+    .card h3 { margin: 0 0 0.5em; color: #58a6ff; }
+    .card p { margin: 0; }
+
+    #editor {
+      background: #0d1117; overflow-y: auto;
+    }
+
+    #editor h2 { font-size: 2em; margin-bottom: 1em; }
+    #editor-form {
+      display: flex; flex-direction: column; gap: 1em;
+    }
+
+    .edit-block {
+      background: #161b22;
+      padding: 1em;
+      border-radius: 6px;
+      cursor: grab;
+    }
+
+    .edit-block input, .edit-block textarea {
+      width: 100%; font-size: 1em;
+      margin-top: 0.5em; padding: 0.5em;
+      border: 1px solid #30363d;
+      background: #0d1117; color: #c9d1d9;
+    }
+
+    .edit-block textarea { resize: vertical; min-height: 100px; }
+
+    .save-btn {
+      background: #2ea043;
+      padding: 0.6em 1.5em;
+      border: none; color: white;
+      border-radius: 6px; font-size: 1em;
+      cursor: pointer;
+    }
+
+    .delete-btn {
+      background: #da3633;
+      margin-top: 0.5em;
+    }
+  </style>
+</head>
+<body>
+
+<div id="slide">
+  <h1 id="slide-title">Cím</h1>
+  <p id="slide-content">Tartalom</p>
+  <div class="controls">
+    <button onclick="nextSlide()">Következő</button>
+    <button class="overview-btn" onclick="showOverview()">Áttekintés</button>
+    <button class="edit-btn" onclick="showEditor()">Szerkesztés</button>
+  </div>
+</div>
+
+<div id="overview">
+  <h2>Áttekintés</h2>
+  <div id="overview-list"></div>
+</div>
+
+<div id="editor">
+  <h2>Szakaszok szerkesztése</h2>
+  <form id="editor-form" ondragover="event.preventDefault()"></form>
+  <div style="margin-top:1em; display:flex; gap:1em;">
+    <button type="button" class="save-btn" onclick="addSlide()">+ Új szakasz</button>
+    <button type="button" class="save-btn" onclick="saveEdits()">Mentés</button>
+  </div>
+</div>
+
+<script>
+  const storageKey = "interview_sections_v4";
+  let slides = [];
+  let current = 0;
+
+  function enterFullscreen() {
+    const el = document.documentElement;
+    if (!document.fullscreenElement && el.requestFullscreen) {
+      el.requestFullscreen();
+    }
+  }
+
+  function loadSlides() {
+    slides = JSON.parse(localStorage.getItem(storageKey)) || [
+      { title: "Bevezetés", content: "Üdv az interjúban!" },
+      { title: "Tapasztalat", content: "Mesélj a tapasztalataidról." },
+      { title: "Készségek", content: "Milyen készségeid vannak?" },
+      { title: "Zárás", content: "Köszönjük az interjút!" }
+    ];
+  }
+
+  function showSlide(index) {
+    current = index;
+    const s = slides[current] || {};
+    document.getElementById("slide-title").textContent = s.title || "Vége";
+    document.getElementById("slide-content").textContent = s.content || "";
+    hideAll();
+    document.getElementById("slide").style.display = "flex";
+  }
+
+  function nextSlide() {
+    if (current + 1 < slides.length) {
+      showSlide(current + 1);
+    } else {
+      document.getElementById("slide-title").textContent = "Vége.";
+      document.getElementById("slide-content").textContent = "";
+    }
+  }
+
+  function showOverview() {
+    const container = document.getElementById("overview-list");
+    container.innerHTML = "";
+    slides.forEach((slide, i) => {
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = `<h3>${slide.title}</h3><p>${slide.content}</p>`;
+      card.onclick = () => showSlide(i);
+      container.appendChild(card);
+    });
+    hideAll();
+    document.getElementById("overview").style.display = "block";
+  }
+
+  function showEditor() {
+    const form = document.getElementById("editor-form");
+    form.innerHTML = "";
+    slides.forEach((slide, i) => {
+      const block = document.createElement("div");
+      block.className = "edit-block";
+      block.draggable = true;
+      block.dataset.index = i;
+      block.ondragstart = e => {
+        e.dataTransfer.setData("text/plain", i);
+      };
+      block.ondrop = e => {
+        const from = +e.dataTransfer.getData("text/plain");
+        const to = +block.dataset.index;
+        if (from !== to) {
+          const moved = slides.splice(from, 1)[0];
+          slides.splice(to, 0, moved);
+          showEditor();
+        }
+      };
+      block.innerHTML = `
+        <label>Cím:</label>
+        <input type="text" name="title-${i}" value="${slide.title}">
+        <label>Tartalom:</label>
+        <textarea name="content-${i}">${slide.content}</textarea>
+        <button type="button" class="delete-btn" onclick="deleteSlide(${i})">Törlés</button>
+      `;
+      form.appendChild(block);
+    });
+    hideAll();
+    document.getElementById("editor").style.display = "block";
+  }
+
+  function addSlide() {
+    slides.push({ title: "Új szakasz", content: "Új tartalom..." });
+    showEditor();
+  }
+
+  function deleteSlide(index) {
+    if (confirm("Biztosan törlöd ezt a szakaszt?")) {
+      slides.splice(index, 1);
+      showEditor();
+    }
+  }
+
+  function saveEdits() {
+    const form = document.getElementById("editor-form");
+    slides = slides.map((_, i) => ({
+      title: form[`title-${i}`]?.value || "",
+      content: form[`content-${i}`]?.value || ""
+    }));
+    localStorage.setItem(storageKey, JSON.stringify(slides));
+    showSlide(0);
+  }
+
+  function hideAll() {
+    document.getElementById("slide").style.display = "none";
+    document.getElementById("overview").style.display = "none";
+    document.getElementById("editor").style.display = "none";
+  }
+
+  document.addEventListener("keydown", e => {
+    if (e.key === "ArrowRight") nextSlide();
+    if (e.key === "Escape") showSlide(current);
+  });
+
+  document.body.onclick = enterFullscreen;
+
+  loadSlides();
+  showSlide(0);
+</script>
+
+</body>
+</html>
